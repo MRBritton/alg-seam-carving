@@ -7,6 +7,7 @@
 #include <sstream>
 #include <algorithm>
 #include <utility>
+#include <typeinfo>
 
 typedef std::vector<int> Row;
 typedef std::vector<Row> Matrix;
@@ -22,7 +23,10 @@ Matrix energyMatrix(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixVertical(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixHorizontal(const Matrix&, int, int);
 
-int minColumnElement(const Matrix&, int, int, int);
+Row::iterator minColumnElement(const Matrix&, int, int, int);
+
+template<typename Iter>
+bool isInRange(Iter, Iter, Iter);
 
 void printMatrix(const Matrix&, int, int);
 void writeNewImage(const std::string&, const Matrix&, int, int, int);
@@ -201,16 +205,20 @@ void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 	std::vector<Pixel> pixels_to_remove;
 
 	int x = xdim - 1;
+	int y = 0;
+
 	while(x >= 0) {
-
-		int min = minColumnElement(horizontal_energy, xdim, ydim, x);
-
+		//FIXME: getting iterator from function local object
+		auto min = minColumnElement(horizontal_energy, xdim, ydim, x);
+		
 		--x;
 	}
 
+	
+
 }
 
-int minColumnElement(const Matrix& m, int xdim, int ydim, int col) {
+Row::iterator minColumnElement(const Matrix& m, int xdim, int ydim, int col) {
 	if(col >= xdim) {
 		throw std::runtime_error("Error - attempted to read column out-of-bounds.");
 	}
@@ -221,11 +229,17 @@ int minColumnElement(const Matrix& m, int xdim, int ydim, int col) {
 		values.push_back(m[y][col]);
 	}
 
-	int min = *std::min_element(values.begin(), values.end());
+	auto min = std::min_element(values.begin(), values.end());
 
-	std::cout << "Min element of column " << col << ": " << min << '\n';
+	//TODO: translate from iterator into vector to iterator into matrix
 
-	return min;
+
+	return min;  //FIXME
+}
+
+template<typename Iter>
+bool isInRange(Iter i, Iter begin, Iter end) {
+	return begin <= i && i < end;
 }
 
 // Calculate the energy matrix of the given image
