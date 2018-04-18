@@ -23,7 +23,10 @@ Matrix energyMatrix(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixVertical(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixHorizontal(const Matrix&, int, int);
 
-Row::iterator minColumnElement(const Matrix&, int, int, int);
+Row::iterator minColumnElement(Matrix&, int, int, int);
+
+template<typename Iter>
+Iter minPointedValues(std::vector<Iter>&);
 
 template<typename Iter>
 bool isInRange(Iter, Iter, Iter);
@@ -80,6 +83,7 @@ int main(int argc, char** argv) {
 
 	filename.insert(filename.find_first_of("."), "_processed");
 	writeNewImage(filename, image, xdim, ydim, gsmax);
+	std::cout << "Processed file written to " << filename << '\n';
 }
 
 // Reads all the integer values of a file, skipping non-ints, including metadata
@@ -161,7 +165,6 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 
 	while(y >= 0) {
 		//Row& currentRow = vertical_energy[y];
-		//FIXME: it's not just the min, it's the min of the 2 to 3 values above the current pixel
 		//auto min = std::min_element(currentRow.begin(), currentRow.end());
 		
 		pixels_to_remove.push_back({y, x});
@@ -207,39 +210,126 @@ void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 	int x = xdim - 1;
 	int y = 0;
 
-	while(x >= 0) {
-		//FIXME: getting iterator from function local object
-		auto min = minColumnElement(horizontal_energy, xdim, ydim, x);
-		
-		--x;
+	auto min = minColumnElement(horizontal_energy, xdim, ydim, x);
+
+	std::cout << "Min = " << *min << '\n';
+
+	//find y dimension of min
+	for(y; y < ydim; ++y) {
+		if(isInRange(min, horizontal_energy[y].begin(), horizontal_energy[y].end())) {
+			pixels_to_remove.push_back({y, x});
+		}
 	}
 
-	
+	while(x > 0) {
+		y = 0;
+		//Determine y-coord of iterator
+		for(; y < ydim; ++y) {
+			if(isInRange(min, horizontal_energy[y].begin(), horizontal_energy[y].end())) {
+				break; //y is the correct row
+			}
+		}
+
+		//Walk back one row
+		--x;
+
+		pixels_to_remove.push_back({y,x});
+
+		std::vector<Row::iterator> to_consider;
+
+		//Consider valid previous steps
+		if(y == 0) {
+			//consider y+1, y
+			to_consider.push_back(horizontal_energy[y].begin() + x);
+			to_consider.push_back(horizontal_energy[y+1].begin() + x);
+		}
+		else if(y == ydim - 1) {
+			//consider y, y-1
+			to_consider.push_back(horizontal_energy[y].begin() + x);
+			to_consider.push_back(horizontal_energy[y-1].begin() + x);
+		}
+		else {
+			//consider y+1, y, y-1
+			to_consider.push_back(horizontal_energy[y-1].begin() + x);
+			to_consider.push_back(horizontal_energy[y].begin() + x);
+			to_consider.push_back(horizontal_energy[y+1].begin() + x);
+		}
+
+		auto iter_to_min = minPointedValues(to_consider);
+
+		std::cout << "Min in range = " << *iter_to_min;
+		std::cout << " at (" << y << ", " << x << ")\n";
+	}
+
+	/*std::cout << "Removing:\n";
+	for(auto i : pixels_to_remove)
+		std::cout << '(' << i.first << ',' << i.second << ") ";
+	std::cout << '\n';*/
+
+	for(auto i : pixels_to_remove) {
+		Row& currentRow = image[i.first];
+
+		std::cout << currentRow[i.second] << ' ';
+
+
+		image[i.first].erase(image[i.first].begin() + i.second);
+	}
+
+	for(auto row = image.begin(); row < image.end(); ++row) {
+		if(row->empty())
+			image.erase(row);
+	}
+
+	--ydim;
+
+	std::cout << "\n\nNew image:\n";
+	printMatrix(image, xdim, ydim);
 
 }
 
-Row::iterator minColumnElement(const Matrix& m, int xdim, int ydim, int col) {
+//Min element of the given column
+Row::iterator minColumnElement(Matrix& m, int xdim, int ydim, int col) {
 	if(col >= xdim) {
 		throw std::runtime_error("Error - attempted to read column out-of-bounds.");
 	}
 
-	std::vector<int> values;
+	std::vector<int> col_values;
 
 	for(int y = 0; y < ydim; ++y) {
-		values.push_back(m[y][col]);
+		col_values.push_back(m[y][col]);
 	}
 
-	auto min = std::min_element(values.begin(), values.end());
+	auto min_col = std::min_element(col_values.begin(), col_values.end());
 
-	//TODO: translate from iterator into vector to iterator into matrix
+	for(int y = 0; y < ydim; ++y) {
+		if(m[y][col] == *min_col) {
+			return m[y].begin() + col;
+		}
+	}
 
+	throw std::runtime_error("Something has gone terribly wrong.");
 
-	return min;  //FIXME
+	return {};
 }
 
 template<typename Iter>
 bool isInRange(Iter i, Iter begin, Iter end) {
 	return begin <= i && i < end;
+}
+
+template<typename Iter>
+Iter minPointedValues(std::vector<Iter>& ptrs) {
+	auto min = *ptrs[0];
+	Iter ptr_to_min = ptrs[0];
+
+	for(int i = 0; i < ptrs.size(); ++i) {
+		if(*ptrs[i] < min) {
+			min = *ptrs[i];
+			ptr_to_min = ptrs[i];
+		}
+	}
+
+	return ptr_to_min;
 }
 
 // Calculate the energy matrix of the given image
