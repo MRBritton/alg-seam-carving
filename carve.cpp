@@ -6,19 +6,25 @@
 #include <stdexcept>
 #include <sstream>
 #include <algorithm>
-#include <cstdio>
+#include <utility>
 
 typedef std::vector<int> Row;
 typedef std::vector<Row> Matrix;
+typedef std::pair<int, int> Pixel;
 
 std::vector<int> readfile(const std::string&);
 void fillImage(const std::vector<int>&, Matrix&);
-void removeVerticalSeam(Matrix&, int, int);
-void removeHorizontalSeam(Matrix&, int, int);
+
+void removeVerticalSeam(Matrix&, int&, int&);
+void removeHorizontalSeam(Matrix&, int&, int&);
+
 Matrix energyMatrix(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixVertical(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixHorizontal(const Matrix&, int, int);
+
 void printMatrix(const Matrix&, int, int);
+void writeNewImage(const Matrix&, int, int, int);
+
 
 int main(int argc, char** argv) {
 
@@ -48,6 +54,7 @@ int main(int argc, char** argv) {
 
 	fillImage(data, image);
 
+	/*	
 	std::cout << "Image data:\n";
 	printMatrix(image, xdim, ydim);
 
@@ -65,18 +72,15 @@ int main(int argc, char** argv) {
 	std::cout << "\n\nCumulative energy matrix (horizontal):\n";
 	Matrix cHorizEn = cumulativeEnergyMatrixHorizontal(energy, xdim, ydim);
 	printMatrix(cHorizEn, xdim, ydim);
-
-	/*
-	for(int i = 0; i < vert_seams; ++i) {
-		removeVerticalSeam(image, xdim, ydim);
-	}
-
-	for(int i = 0; i < horiz_seams; ++i) {
-		removeHorizontalSeam(image, xdim, ydim);
-	}
 	*/
 
+	removeVerticalSeam(image, xdim, ydim);
 
+	// for i < vert_seams:
+	//		remove vert seam(image)
+
+	// for j < horiz_seams:
+	//		remove horiz seam(image)
 }
 
 // Reads all the integer values of a file, skipping non-ints, including metadata
@@ -116,6 +120,7 @@ std::vector<int> readfile(const std::string& filename) {
 	return values;
 }
 
+// Fill the image matrix with the values read from the file
 void fillImage(const std::vector<int>& data, Matrix& image) {
 	int x = 0;
 	int y = 0;
@@ -137,14 +142,39 @@ void fillImage(const std::vector<int>& data, Matrix& image) {
 	}	
 }
 
-void removeVerticalSeam(Matrix& image, int xdim, int ydim) {
-	
+// Remove one vertical seam from the image
+void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
+	Matrix energy_matrix = energyMatrix(image, xdim, ydim);
+	Matrix vertical_energy = cumulativeEnergyMatrixVertical(energy_matrix, xdim, ydim);
+
+	std::vector<Pixel> pixels_to_remove;
+
+	int y = ydim - 1;
+	while(y >= 0) {
+		Row& currentRow = vertical_energy[y];
+		auto min = std::min_element(currentRow.begin(), currentRow.end());
+
+
+		/*
+		std::cout << "Min: " << *min;
+		int x = std::distance(currentRow.begin(), min);
+		std::cout << " at [" << y << "][" << x << "]\n";
+		*/
+
+		pixels_to_remove.push_back({y, x});
+		
+
+		--y;
+	}
 }
 
-void removeHorizontalSeam(Matrix& image, int xdim, int ydim) {
+
+// Remove one horizontal seam from the image
+void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 
 }
 
+// Calculate the energy matrix of the given image
 Matrix energyMatrix(const Matrix& image, int xdim, int ydim) {
 	Matrix energy_matrix(ydim, Row(xdim));
 
@@ -173,7 +203,7 @@ Matrix energyMatrix(const Matrix& image, int xdim, int ydim) {
 	return energy_matrix;
 }
 
-
+// Calculate the cumulative vertical energy matrix from the given energy matrix
 Matrix cumulativeEnergyMatrixVertical(const Matrix& energy_matrix, int xdim, int ydim) {
 	Matrix cumul_energy(ydim, Row(xdim));
 
@@ -203,7 +233,7 @@ Matrix cumulativeEnergyMatrixVertical(const Matrix& energy_matrix, int xdim, int
 	return cumul_energy;
 }
 
-
+// Calculate the cumulative horizontal energy matrix from the given energy matrix
 Matrix cumulativeEnergyMatrixHorizontal(const Matrix& energy_matrix, int xdim, int ydim) {
 	Matrix cumul_energy(ydim, Row(xdim));
 
@@ -233,6 +263,7 @@ Matrix cumulativeEnergyMatrixHorizontal(const Matrix& energy_matrix, int xdim, i
 	return cumul_energy;
 }
 
+// Print the given matrix of given dimensions
 void printMatrix(const Matrix& matrix, int xdim, int ydim) {
 	for(int y = 0; y < ydim; ++y) {
 		for(int x = 0; x < xdim; ++x) {
