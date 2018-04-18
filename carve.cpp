@@ -22,6 +22,8 @@ Matrix energyMatrix(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixVertical(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixHorizontal(const Matrix&, int, int);
 
+int minColumnElement(const Matrix&, int, int, int);
+
 void printMatrix(const Matrix&, int, int);
 void writeNewImage(const std::string&, const Matrix&, int, int, int);
 
@@ -149,24 +151,35 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 	std::vector<Pixel> pixels_to_remove;
 
 	int y = ydim - 1;
+	Row& currentRow = vertical_energy[y];
+	auto min = std::min_element(currentRow.begin(), currentRow.end());
+	int x = std::distance(currentRow.begin(), min); // xcoord of bottom min - start of solution
+
 	while(y >= 0) {
-		Row& currentRow = vertical_energy[y];
-		auto min = std::min_element(currentRow.begin(), currentRow.end());
-
-		int x = std::distance(currentRow.begin(), min);
+		//Row& currentRow = vertical_energy[y];
+		//FIXME: it's not just the min, it's the min of the 2 to 3 values above the current pixel
+		//auto min = std::min_element(currentRow.begin(), currentRow.end());
 		
-		// std::cout << "Min: " << *min;
-		// std::cout << " at [" << y << "][" << x << "]\n";
-		
-
 		pixels_to_remove.push_back({y, x});
+
 		--y;
+
+		if(y < 0)
+			break;
+
+		currentRow = vertical_energy[y];
+
+		x = std::distance(currentRow.begin(), 
+			std::min_element(currentRow.begin() + (x - 1 > -1 ? x - 1 : x), currentRow.begin() + (x + 1 < xdim ? x + 2 : x + 1)));
+
+		//int x = std::distance(currentRow.begin(), min);
+
+		//--y;
 	}
 
 	for(auto i : pixels_to_remove) {
 		image[i.first].erase(image[i.first].begin() + i.second);
 	}
-
 	--xdim;
 
 	std::cout << "\n\nNew image:\n";
@@ -176,7 +189,43 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 
 // Remove one horizontal seam from the image
 void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
+	Matrix energy_matrix = energyMatrix(image, xdim, ydim);
+	Matrix horizontal_energy = cumulativeEnergyMatrixHorizontal(energy_matrix, xdim, ydim);
 
+	std::cout << "\n\nEnergy matrix:\n";
+	printMatrix(energy_matrix, xdim, ydim);
+
+	std::cout << "\n\nHorizontal energy:\n";
+	printMatrix(horizontal_energy, xdim, ydim);
+
+	std::vector<Pixel> pixels_to_remove;
+
+	int x = xdim - 1;
+	while(x >= 0) {
+
+		int min = minColumnElement(horizontal_energy, xdim, ydim, x);
+
+		--x;
+	}
+
+}
+
+int minColumnElement(const Matrix& m, int xdim, int ydim, int col) {
+	if(col >= xdim) {
+		throw std::runtime_error("Error - attempted to read column out-of-bounds.");
+	}
+
+	std::vector<int> values;
+
+	for(int y = 0; y < ydim; ++y) {
+		values.push_back(m[y][col]);
+	}
+
+	int min = *std::min_element(values.begin(), values.end());
+
+	std::cout << "Min element of column " << col << ": " << min << '\n';
+
+	return min;
 }
 
 // Calculate the energy matrix of the given image
