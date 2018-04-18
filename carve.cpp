@@ -23,7 +23,7 @@ Matrix cumulativeEnergyMatrixVertical(const Matrix&, int, int);
 Matrix cumulativeEnergyMatrixHorizontal(const Matrix&, int, int);
 
 void printMatrix(const Matrix&, int, int);
-void writeNewImage(const Matrix&, int, int, int);
+void writeNewImage(const std::string&, const Matrix&, int, int, int);
 
 
 int main(int argc, char** argv) {
@@ -41,6 +41,7 @@ int main(int argc, char** argv) {
 
 	int xdim = data[0];
 	int ydim = data[1];
+	int gsmax = data[2];
 	
 	//Double-check the size of the image 
 	if(data.size() - 3 != xdim * ydim) {
@@ -54,33 +55,19 @@ int main(int argc, char** argv) {
 
 	fillImage(data, image);
 
-	/*	
-	std::cout << "Image data:\n";
+	std::cout << "Image:\n";
 	printMatrix(image, xdim, ydim);
 
+	for(int i = 0; i < vert_seams; ++i) {
+		removeVerticalSeam(image, xdim, ydim);
+	}
 
-	std::cout << "\n\nEnergy matrix (vertical):\n";
-	Matrix energy = energyMatrix(image, xdim, ydim);
-	printMatrix(energy, xdim, ydim);
+	for(int i = 0; i < horiz_seams; ++i) {
+		removeHorizontalSeam(image, xdim, ydim);
+	}
 
-
-	std::cout << "\n\nCumulative energy matrix (vertical):\n";
-	Matrix cverten = cumulativeEnergyMatrixVertical(energy, xdim, ydim);
-	printMatrix(cverten, xdim, ydim);
-
-
-	std::cout << "\n\nCumulative energy matrix (horizontal):\n";
-	Matrix cHorizEn = cumulativeEnergyMatrixHorizontal(energy, xdim, ydim);
-	printMatrix(cHorizEn, xdim, ydim);
-	*/
-
-	removeVerticalSeam(image, xdim, ydim);
-
-	// for i < vert_seams:
-	//		remove vert seam(image)
-
-	// for j < horiz_seams:
-	//		remove horiz seam(image)
+	filename.insert(filename.find_first_of("."), "_processed");
+	writeNewImage(filename, image, xdim, ydim, gsmax);
 }
 
 // Reads all the integer values of a file, skipping non-ints, including metadata
@@ -147,6 +134,12 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 	Matrix energy_matrix = energyMatrix(image, xdim, ydim);
 	Matrix vertical_energy = cumulativeEnergyMatrixVertical(energy_matrix, xdim, ydim);
 
+	std::cout << "\n\nEnergy matrix:\n";
+	printMatrix(energy_matrix, xdim, ydim);
+
+	std::cout << "\n\nVertical energy:\n";
+	printMatrix(vertical_energy, xdim, ydim);
+
 	std::vector<Pixel> pixels_to_remove;
 
 	int y = ydim - 1;
@@ -154,18 +147,24 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 		Row& currentRow = vertical_energy[y];
 		auto min = std::min_element(currentRow.begin(), currentRow.end());
 
-
-		/*
-		std::cout << "Min: " << *min;
 		int x = std::distance(currentRow.begin(), min);
-		std::cout << " at [" << y << "][" << x << "]\n";
-		*/
-
-		pixels_to_remove.push_back({y, x});
+		
+		// std::cout << "Min: " << *min;
+		// std::cout << " at [" << y << "][" << x << "]\n";
 		
 
+		pixels_to_remove.push_back({y, x});
 		--y;
 	}
+
+	for(auto i : pixels_to_remove) {
+		image[i.first].erase(image[i.first].begin() + i.second);
+	}
+
+	--xdim;
+
+	std::cout << "\n\nNew image:\n";
+	printMatrix(image, xdim, ydim);
 }
 
 
@@ -270,5 +269,27 @@ void printMatrix(const Matrix& matrix, int xdim, int ydim) {
 			std::cout << matrix[y][x] << ' ';
 		}
 		std::cout << '\n';
+	}
+}
+
+// Print the modified image to the given filename 
+void writeNewImage(const std::string& filename, const Matrix& image, int xdim, int ydim, int gsmax) {
+	std::ofstream outfile(filename);
+	if(!outfile.is_open()) {
+		std::stringstream ss;
+		ss << "Error - could not open file " << filename << " to write processed image.";
+		throw std::runtime_error(ss.str());
+	}
+
+	outfile << "P2\n";
+	outfile << "# Processed image\n";
+	outfile << xdim << ' ' << ydim << '\n';
+	outfile << gsmax << '\n';
+
+	for(int y = 0; y < ydim; ++y) {
+		for(int x = 0; x < xdim; ++x) {
+			outfile << image[y][x] << ' ';
+		}
+		outfile << '\n';
 	}
 }
