@@ -42,12 +42,18 @@ int main(int argc, char** argv) {
 	int xdim = data[0];
 	int ydim = data[1];
 	int gsmax = data[2];
+
 	
 	//Double-check the size of the image 
 	if(data.size() - 3 != xdim * ydim) {
-		std::stringstream ss;
-		ss << "Error - expected an image of size " << xdim * ydim << ", but got " << data.size() - 3;
-		throw std::runtime_error(ss.str());
+		std::cout << "Error - expected an image of size " << xdim * ydim << ", but got " << data.size() - 3 << '\n';
+		return -1;
+	}
+
+	//Make sure that there is actually image data to process
+	if(data.size() - 3 <= 0) {
+		std::cout << "Error - cannot process an image of size 0.\n";
+		return -1;
 	}
 
 	//Allocate storage for the image
