@@ -31,6 +31,9 @@ Iter minPointedValues(std::vector<Iter>&);
 template<typename Iter>
 bool isInRange(Iter, Iter, Iter);
 
+template<typename Iter>
+int findYIndexInMatrix(Iter i, Matrix& m, int xdim, int ydim);
+
 void printMatrix(const Matrix&, int, int);
 void writeNewImage(const std::string&, const Matrix&, int, int, int);
 
@@ -70,14 +73,15 @@ int main(int argc, char** argv) {
 
 	fillImage(data, image);
 
-	std::cout << "Image:\n";
-	printMatrix(image, xdim, ydim);
+	/*std::cout << "Image:\n";
+	printMatrix(image, xdim, ydim);*/
 
 	for(int i = 0; i < vert_seams; ++i) {
 		removeVerticalSeam(image, xdim, ydim);
 	}
 
 	for(int i = 0; i < horiz_seams; ++i) {
+		//std::cout << "y dimension : " << ydim << '\n';
 		removeHorizontalSeam(image, xdim, ydim);
 	}
 
@@ -195,96 +199,106 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 
 
 // Remove one horizontal seam from the image
+
+// FIXME: broken on multiple iterations, doesn't work quite right
 void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 	Matrix energy_matrix = energyMatrix(image, xdim, ydim);
 	Matrix horizontal_energy = cumulativeEnergyMatrixHorizontal(energy_matrix, xdim, ydim);
 
+	std::cout << "\n\nImage:\n";
+	printMatrix(image, xdim, ydim);
+
 	std::cout << "\n\nEnergy matrix:\n";
 	printMatrix(energy_matrix, xdim, ydim);
 
-	std::cout << "\n\nHorizontal energy:\n";
+	std::cout << "\n\nCumulative energy:\n";
 	printMatrix(horizontal_energy, xdim, ydim);
 
+	//Start backtracing from the right
+	int x = xdim - 1;
+	auto min_in_range = minColumnElement(horizontal_energy, xdim, ydim, x);
+
+	std::cout << "\n\nRightmost min: " << *min_in_range;
+
+	int y = findYIndexInMatrix(min_in_range, horizontal_energy, xdim, ydim);
+
+	std::cout << " (" << y << ',' << x << ")\n";
+	
 	std::vector<Pixel> pixels_to_remove;
 
-	int x = xdim - 1;
-	int y = 0;
-
-	auto min = minColumnElement(horizontal_energy, xdim, ydim, x);
-
-	std::cout << "Min = " << *min << '\n';
-
-	//find y dimension of min
-	for(y; y < ydim; ++y) {
-		if(isInRange(min, horizontal_energy[y].begin(), horizontal_energy[y].end())) {
-			pixels_to_remove.push_back({y, x});
-		}
-	}
+	pixels_to_remove.push_back({y, x});
 
 	while(x > 0) {
-		y = 0;
-		//Determine y-coord of iterator
-		for(; y < ydim; ++y) {
-			if(isInRange(min, horizontal_energy[y].begin(), horizontal_energy[y].end())) {
-				break; //y is the correct row
-			}
+		//Look at the next column
+		--x;
+
+		std::vector<Row::iterator> pixels_to_check;
+
+		if(y == 0) {
+			// Look at (y,x), (y+1,x)
+			pixels_to_check.push_back(horizontal_energy[y].begin() + x);
+
+			if(y + 1 != ydim)
+				pixels_to_check.push_back(horizontal_energy[y+1].begin() + x);
+		}
+		else if(y == ydim - 1) {
+			// Look at y-1, y
+			pixels_to_check.push_back(horizontal_energy[y-1].begin() + x);
+			pixels_to_check.push_back(horizontal_energy[y].begin() + x);
+		}
+		else {
+			// Look at y-1, y, y+1
+			pixels_to_check.push_back(horizontal_energy[y-1].begin() + x);
+			pixels_to_check.push_back(horizontal_energy[y].begin() + x);
+			pixels_to_check.push_back(horizontal_energy[y+1].begin() + x);
 		}
 
-		//Walk back one row
-		--x;
+		//Find minimum of pointed pixels
+		min_in_range = minPointedValues(pixels_to_check);
+
+		//update y
+		y = findYIndexInMatrix(min_in_range, horizontal_energy, xdim, ydim);
 
 		pixels_to_remove.push_back({y,x});
 
-		std::vector<Row::iterator> to_consider;
-
-		//Consider valid previous steps
-		if(y == 0) {
-			//consider y+1, y
-			to_consider.push_back(horizontal_energy[y].begin() + x);
-			to_consider.push_back(horizontal_energy[y+1].begin() + x);
-		}
-		else if(y == ydim - 1) {
-			//consider y, y-1
-			to_consider.push_back(horizontal_energy[y].begin() + x);
-			to_consider.push_back(horizontal_energy[y-1].begin() + x);
-		}
-		else {
-			//consider y+1, y, y-1
-			to_consider.push_back(horizontal_energy[y-1].begin() + x);
-			to_consider.push_back(horizontal_energy[y].begin() + x);
-			to_consider.push_back(horizontal_energy[y+1].begin() + x);
-		}
-
-		auto iter_to_min = minPointedValues(to_consider);
-
-		std::cout << "Min in range = " << *iter_to_min;
-		std::cout << " at (" << y << ", " << x << ")\n";
+		std::cout << "Next min: " << *min_in_range << " (" << y << ',' << x << ")\n";
 	}
 
-	/*std::cout << "Removing:\n";
-	for(auto i : pixels_to_remove)
-		std::cout << '(' << i.first << ',' << i.second << ") ";
-	std::cout << '\n';*/
-
+	std::cout << "\n\nPixels marked for deletion:\n";
 	for(auto i : pixels_to_remove) {
-		Row& currentRow = image[i.first];
-
-		std::cout << currentRow[i.second] << ' ';
-
-
-		image[i.first].erase(image[i.first].begin() + i.second);
+		std::cout << '(' << i.first << ',' << i.second << ")\n";
 	}
 
-	for(auto row = image.begin(); row < image.end(); ++row) {
-		if(row->empty())
-			image.erase(row);
+	//Remove pixels marked for deletion
+	for(auto i : pixels_to_remove) {
+		std::cout << "\nRemoving " << image[i.first][i.second];
+		image[i.first][i.second] = -1;
 	}
 
+	std::cout << "\n\nIntermediate image:\n";
+	printMatrix(image, xdim, ydim);
+
+	//Overwrite any deleted pixels by shifting up all values below them
+	for(int ydx = 0; ydx < ydim; ++ydx) {
+		for(int xdx = 0; xdx < xdim; ++xdx) {
+			if(image[ydx][xdx] == -1) {
+				for(int k = ydx; k < ydim - 1; ++k) {
+					image[k][xdx] = image[k + 1][xdx];
+				}
+			}
+		}
+	}
+
+	//Delete the bottom row
+	image.erase(image.begin() + ydim - 1);
+
+	//Make note of the image's reduced y-dimension
 	--ydim;
+
+	
 
 	std::cout << "\n\nNew image:\n";
 	printMatrix(image, xdim, ydim);
-
 }
 
 //Min element of the given column
@@ -310,6 +324,17 @@ Row::iterator minColumnElement(Matrix& m, int xdim, int ydim, int col) {
 	throw std::runtime_error("Something has gone terribly wrong.");
 
 	return {};
+}
+
+template<typename Iter>
+int findYIndexInMatrix(Iter i,Matrix& m, int xdim, int ydim) {
+	for(int y = 0; y < ydim; ++y) {
+		if(isInRange(i, m[y].begin(), m[y].end())){
+			// std::cout << "found at y = " << y << '\n';
+			return y;
+		}
+	}
+	return -1;
 }
 
 template<typename Iter>
@@ -425,7 +450,9 @@ Matrix cumulativeEnergyMatrixHorizontal(const Matrix& energy_matrix, int xdim, i
 void printMatrix(const Matrix& matrix, int xdim, int ydim) {
 	for(int y = 0; y < ydim; ++y) {
 		for(int x = 0; x < xdim; ++x) {
-			std::cout << matrix[y][x] << ' ';
+			//if(matrix[y][x] != -1){
+				std::cout << matrix[y][x] << ' ';
+			//}
 		}
 		std::cout << '\n';
 	}
