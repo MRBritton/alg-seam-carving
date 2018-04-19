@@ -73,9 +73,6 @@ int main(int argc, char** argv) {
 
 	fillImage(data, image);
 
-	/*std::cout << "Image:\n";
-	printMatrix(image, xdim, ydim);*/
-
 	for(int i = 0; i < vert_seams; ++i) {
 		removeVerticalSeam(image, xdim, ydim);
 	}
@@ -154,11 +151,13 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 	Matrix energy_matrix = energyMatrix(image, xdim, ydim);
 	Matrix vertical_energy = cumulativeEnergyMatrixVertical(energy_matrix, xdim, ydim);
 
+	/*
 	std::cout << "\n\nEnergy matrix:\n";
 	printMatrix(energy_matrix, xdim, ydim);
 
 	std::cout << "\n\nVertical energy:\n";
 	printMatrix(vertical_energy, xdim, ydim);
+	*/
 
 	std::vector<Pixel> pixels_to_remove;
 
@@ -167,14 +166,10 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 	auto min = std::min_element(currentRow.begin(), currentRow.end());
 	int x = std::distance(currentRow.begin(), min); // xcoord of bottom min - start of solution
 
-	while(y >= 0) {
-		//Row& currentRow = vertical_energy[y];
-		//auto min = std::min_element(currentRow.begin(), currentRow.end());
-		
+	while(y >= 0) {		
 		pixels_to_remove.push_back({y, x});
-
+		
 		--y;
-
 		if(y < 0)
 			break;
 
@@ -182,10 +177,6 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 
 		x = std::distance(currentRow.begin(), 
 			std::min_element(currentRow.begin() + (x - 1 > -1 ? x - 1 : x), currentRow.begin() + (x + 1 < xdim ? x + 2 : x + 1)));
-
-		//int x = std::distance(currentRow.begin(), min);
-
-		//--y;
 	}
 
 	for(auto i : pixels_to_remove) {
@@ -193,18 +184,19 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 	}
 	--xdim;
 
+	/*
 	std::cout << "\n\nNew image:\n";
 	printMatrix(image, xdim, ydim);
+	*/
 }
 
 
 // Remove one horizontal seam from the image
-
-// FIXME: broken on multiple iterations, doesn't work quite right
 void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 	Matrix energy_matrix = energyMatrix(image, xdim, ydim);
 	Matrix horizontal_energy = cumulativeEnergyMatrixHorizontal(energy_matrix, xdim, ydim);
 
+	/*
 	std::cout << "\n\nImage:\n";
 	printMatrix(image, xdim, ydim);
 
@@ -213,16 +205,17 @@ void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 
 	std::cout << "\n\nCumulative energy:\n";
 	printMatrix(horizontal_energy, xdim, ydim);
+	*/
 
 	//Start backtracing from the right
 	int x = xdim - 1;
 	auto min_in_range = minColumnElement(horizontal_energy, xdim, ydim, x);
 
-	std::cout << "\n\nRightmost min: " << *min_in_range;
+	//std::cout << "\n\nRightmost min: " << *min_in_range;
 
 	int y = findYIndexInMatrix(min_in_range, horizontal_energy, xdim, ydim);
 
-	std::cout << " (" << y << ',' << x << ")\n";
+	//std::cout << " (" << y << ',' << x << ")\n";
 	
 	std::vector<Pixel> pixels_to_remove;
 
@@ -261,22 +254,24 @@ void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 
 		pixels_to_remove.push_back({y,x});
 
-		std::cout << "Next min: " << *min_in_range << " (" << y << ',' << x << ")\n";
+		//std::cout << "Next min: " << *min_in_range << " (" << y << ',' << x << ")\n";
 	}
 
+	/*
 	std::cout << "\n\nPixels marked for deletion:\n";
 	for(auto i : pixels_to_remove) {
 		std::cout << '(' << i.first << ',' << i.second << ")\n";
 	}
+	*/
 
 	//Remove pixels marked for deletion
 	for(auto i : pixels_to_remove) {
-		std::cout << "\nRemoving " << image[i.first][i.second];
+		//std::cout << "\nRemoving " << image[i.first][i.second];
 		image[i.first][i.second] = -1;
 	}
 
-	std::cout << "\n\nIntermediate image:\n";
-	printMatrix(image, xdim, ydim);
+	/*std::cout << "\n\nIntermediate image:\n";
+	printMatrix(image, xdim, ydim);*/
 
 	//Overwrite any deleted pixels by shifting up all values below them
 	for(int ydx = 0; ydx < ydim; ++ydx) {
@@ -297,8 +292,8 @@ void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 
 	
 
-	std::cout << "\n\nNew image:\n";
-	printMatrix(image, xdim, ydim);
+	/*std::cout << "\n\nNew image:\n";
+	printMatrix(image, xdim, ydim);*/
 }
 
 //Min element of the given column
