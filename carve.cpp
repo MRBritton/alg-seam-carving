@@ -78,7 +78,6 @@ int main(int argc, char** argv) {
 	}
 
 	for(int i = 0; i < horiz_seams; ++i) {
-		//std::cout << "y dimension : " << ydim << '\n';
 		removeHorizontalSeam(image, xdim, ydim);
 	}
 
@@ -151,16 +150,10 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 	Matrix energy_matrix = energyMatrix(image, xdim, ydim);
 	Matrix vertical_energy = cumulativeEnergyMatrixVertical(energy_matrix, xdim, ydim);
 
-	/*
-	std::cout << "\n\nEnergy matrix:\n";
-	printMatrix(energy_matrix, xdim, ydim);
-
-	std::cout << "\n\nVertical energy:\n";
-	printMatrix(vertical_energy, xdim, ydim);
-	*/
-
+	//Pixels marked to be removed
 	std::vector<Pixel> pixels_to_remove;
 
+	//Work up from the bottom row
 	int y = ydim - 1;
 	Row& currentRow = vertical_energy[y];
 	auto min = std::min_element(currentRow.begin(), currentRow.end());
@@ -175,19 +168,18 @@ void removeVerticalSeam(Matrix& image, int& xdim, int& ydim) {
 
 		currentRow = vertical_energy[y];
 
+		//find the x index of the minimum value of the 2 to 3 pixels above the current pixel
 		x = std::distance(currentRow.begin(), 
-			std::min_element(currentRow.begin() + (x - 1 > -1 ? x - 1 : x), currentRow.begin() + (x + 1 < xdim ? x + 2 : x + 1)));
+			std::min_element(currentRow.begin() + (x - 1 > -1 ? x - 1 : x), 
+				currentRow.begin() + (x + 1 < xdim ? x + 2 : x + 1)
+				)
+			);
 	}
 
 	for(auto i : pixels_to_remove) {
 		image[i.first].erase(image[i.first].begin() + i.second);
 	}
 	--xdim;
-
-	/*
-	std::cout << "\n\nNew image:\n";
-	printMatrix(image, xdim, ydim);
-	*/
 }
 
 
@@ -196,26 +188,11 @@ void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 	Matrix energy_matrix = energyMatrix(image, xdim, ydim);
 	Matrix horizontal_energy = cumulativeEnergyMatrixHorizontal(energy_matrix, xdim, ydim);
 
-	/*
-	std::cout << "\n\nImage:\n";
-	printMatrix(image, xdim, ydim);
-
-	std::cout << "\n\nEnergy matrix:\n";
-	printMatrix(energy_matrix, xdim, ydim);
-
-	std::cout << "\n\nCumulative energy:\n";
-	printMatrix(horizontal_energy, xdim, ydim);
-	*/
-
 	//Start backtracing from the right
 	int x = xdim - 1;
 	auto min_in_range = minColumnElement(horizontal_energy, xdim, ydim, x);
 
-	//std::cout << "\n\nRightmost min: " << *min_in_range;
-
 	int y = findYIndexInMatrix(min_in_range, horizontal_energy, xdim, ydim);
-
-	//std::cout << " (" << y << ',' << x << ")\n";
 	
 	std::vector<Pixel> pixels_to_remove;
 
@@ -253,25 +230,13 @@ void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 		y = findYIndexInMatrix(min_in_range, horizontal_energy, xdim, ydim);
 
 		pixels_to_remove.push_back({y,x});
-
-		//std::cout << "Next min: " << *min_in_range << " (" << y << ',' << x << ")\n";
 	}
 
-	/*
-	std::cout << "\n\nPixels marked for deletion:\n";
-	for(auto i : pixels_to_remove) {
-		std::cout << '(' << i.first << ',' << i.second << ")\n";
-	}
-	*/
-
+	//Can't just call vector::erase since these could be in any one of the rows
 	//Remove pixels marked for deletion
 	for(auto i : pixels_to_remove) {
-		//std::cout << "\nRemoving " << image[i.first][i.second];
 		image[i.first][i.second] = -1;
 	}
-
-	/*std::cout << "\n\nIntermediate image:\n";
-	printMatrix(image, xdim, ydim);*/
 
 	//Overwrite any deleted pixels by shifting up all values below them
 	for(int ydx = 0; ydx < ydim; ++ydx) {
@@ -289,11 +254,6 @@ void removeHorizontalSeam(Matrix& image, int& xdim, int& ydim) {
 
 	//Make note of the image's reduced y-dimension
 	--ydim;
-
-	
-
-	/*std::cout << "\n\nNew image:\n";
-	printMatrix(image, xdim, ydim);*/
 }
 
 //Min element of the given column
@@ -308,6 +268,7 @@ Row::iterator minColumnElement(Matrix& m, int xdim, int ydim, int col) {
 		col_values.push_back(m[y][col]);
 	}
 
+	//find the minimum of the values in the column
 	auto min_col = std::min_element(col_values.begin(), col_values.end());
 
 	for(int y = 0; y < ydim; ++y) {
@@ -316,27 +277,30 @@ Row::iterator minColumnElement(Matrix& m, int xdim, int ydim, int col) {
 		}
 	}
 
-	throw std::runtime_error("Something has gone terribly wrong.");
+	//if we get down here there's been some kind of error, every column should have a minimum
+	throw std::logic_error("Something has gone terribly wrong.");
 
 	return {};
 }
 
+//Find the y-index of the value at a given iterator in the matrix
 template<typename Iter>
 int findYIndexInMatrix(Iter i,Matrix& m, int xdim, int ydim) {
 	for(int y = 0; y < ydim; ++y) {
 		if(isInRange(i, m[y].begin(), m[y].end())){
-			// std::cout << "found at y = " << y << '\n';
 			return y;
 		}
 	}
 	return -1;
 }
 
+//Determine whether a given iterator is in the given range
 template<typename Iter>
 bool isInRange(Iter i, Iter begin, Iter end) {
 	return begin <= i && i < end;
 }
 
+//Determine which iterator of the vector points to the smallest value
 template<typename Iter>
 Iter minPointedValues(std::vector<Iter>& ptrs) {
 	auto min = *ptrs[0];
@@ -445,9 +409,7 @@ Matrix cumulativeEnergyMatrixHorizontal(const Matrix& energy_matrix, int xdim, i
 void printMatrix(const Matrix& matrix, int xdim, int ydim) {
 	for(int y = 0; y < ydim; ++y) {
 		for(int x = 0; x < xdim; ++x) {
-			//if(matrix[y][x] != -1){
-				std::cout << matrix[y][x] << ' ';
-			//}
+			std::cout << matrix[y][x] << ' ';
 		}
 		std::cout << '\n';
 	}
